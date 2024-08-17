@@ -1,6 +1,4 @@
 use check_elevation::is_elevated;
-
-
 use std::process::Command;
 use std::{str, thread};
 use regex::Regex;
@@ -29,7 +27,7 @@ fn main() {
 		for (user_name, id) in user_listing {
 			println!("id:{} - {}", id, user_name);
 			if !dry_run {
-				log_user_out(id);
+				log_user_off(id);
 			}
 		}
 	}
@@ -37,13 +35,11 @@ fn main() {
 	thread::sleep(Duration::from_millis(4000));
 }
 
-fn log_user_out(id: i32) {
-	let result = Command::new("logoff")
+fn log_user_off(id: i32) {
+	Command::new("logoff")
 		.arg(id.to_string())
-		.output()
+		.spawn()
 		.expect("Could not log user off");
-
-	assert!(result.status.success());
 }
 
 fn get_non_current_users() -> Vec<(String, i32)> {
@@ -58,8 +54,7 @@ fn get_non_current_users() -> Vec<(String, i32)> {
 	let user_listing = other_user_sessions_reg.captures_iter(&cmd_output)
 		.map(|m| {
 			return (m.get(2).unwrap().as_str().to_string(), m.get(3).unwrap().as_str().parse::<i32>().unwrap());
-		})
-		.filter(|s| s.1 != 0)
+		}).filter(|s| s.1 != 0)
 		.collect::<Vec<(String, i32)>>();
 
 	user_listing
