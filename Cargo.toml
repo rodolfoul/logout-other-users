@@ -1,0 +1,12 @@
+[package]
+name = "logout-other-users"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+
+[dependencies]
+regex = "1.10.6"
+check_elevation = "0.2.4"
+
+[build-dependencies]
+winres = "0.1"
