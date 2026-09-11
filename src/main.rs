@@ -1,15 +1,16 @@
 use check_elevation::is_elevated;
 use std::io::{self, Write};
 use std::os::windows::ffi::OsStrExt;
+use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
 use std::time::Duration;
-use std::{env, thread};
-use windows::Win32::Foundation::{CloseHandle, WAIT_FAILED};
+use std::{env, process, thread};
+use windows::Win32::Foundation::{HANDLE, WAIT_FAILED};
 use windows::Win32::System::Console::{AttachConsole, FreeConsole};
 use windows::Win32::System::RemoteDesktop::{
     ProcessIdToSessionId, WTS_SESSION_INFOW, WTSEnumerateSessionsW, WTSFreeMemory,
     WTSLogoffSession, WTSQuerySessionInformationW, WTSUserName,
 };
-use windows::Win32::System::Threading::{GetCurrentProcessId, INFINITE, WaitForSingleObject};
+use windows::Win32::System::Threading::{INFINITE, WaitForSingleObject};
 use windows::Win32::UI::Shell::{SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW, ShellExecuteExW};
 use windows::Win32::UI::WindowsAndMessaging::SW_HIDE;
 use windows::core::{PCWSTR, w};
@@ -116,12 +117,10 @@ fn request_elevated_logout_and_wait() {
         .encode_wide()
         .chain(Some(0))
         .collect::<Vec<_>>();
-    let parameters = format!("{ELEVATED_HELPER_ARGUMENT} {}", unsafe {
-        GetCurrentProcessId()
-    })
-    .encode_utf16()
-    .chain(Some(0))
-    .collect::<Vec<_>>();
+    let parameters = format!("{ELEVATED_HELPER_ARGUMENT} {}", process::id())
+        .encode_utf16()
+        .chain(Some(0))
+        .collect::<Vec<_>>();
 
     let _ = io::stdout().flush();
 
@@ -140,12 +139,11 @@ fn request_elevated_logout_and_wait() {
         return;
     }
 
-    let wait_result = unsafe { WaitForSingleObject(execute_info.hProcess, INFINITE) };
+    let process_handle = unsafe { OwnedHandle::from_raw_handle(execute_info.hProcess.0) };
+    let wait_result =
+        unsafe { WaitForSingleObject(HANDLE(process_handle.as_raw_handle()), INFINITE) };
     if wait_result == WAIT_FAILED {
         eprintln!("Unable to wait for the logout operation to finish");
-    }
-    unsafe {
-        let _ = CloseHandle(execute_info.hProcess);
     }
 }
 
@@ -194,7 +192,7 @@ fn get_non_current_users() -> windows::core::Result<Vec<(String, u32)>> {
 
 fn current_session_id() -> windows::core::Result<u32> {
     unsafe {
-        let pid = GetCurrentProcessId();
+        let pid = process::id();
         let mut session_id = 0u32;
         ProcessIdToSessionId(pid, &mut session_id)?;
         Ok(session_id)
